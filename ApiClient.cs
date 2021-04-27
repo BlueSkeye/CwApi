@@ -15,6 +15,7 @@ namespace CwApi
     public class ApiClient
     {
         private string CyberwatchPrefix = "Cyberwatch";
+        private const string GroupPathPattern = "/api/v3/groups/{0}";
         private const string GroupsPath = "/api/v3/groups";
         private const string PingPath = "/api/v3/ping";
         private string _apiKey;
@@ -66,8 +67,7 @@ namespace CwApi
                         }
                         fullResponse.Write(buffer, 0, inputBytes);
                     }
-                    string responseText =
-                        Encoding.ASCII.GetString(fullResponse.GetBuffer());
+                    string responseText = Encoding.ASCII.GetString(fullResponse.ToArray());
                     return DeserializeResponse<T>(responseText);
                 }
             }
@@ -87,13 +87,27 @@ namespace CwApi
             return new Uri(_baseUri, path ?? throw new ArgumentNullException(nameof(path)));
         }
 
+        public GroupResult GetGroup(int groupId)
+        {
+            Uri pingUri = GetUri(string.Format(GroupPathPattern, groupId));
+            using (HttpClient client = GetClient()) {
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(pingUri);
+                HttpWebResponse response = client.Send(request);
+                return (null == response)
+                    ? null
+                    : ExtractResponse<GroupResult>(response);
+            }
+        }
+
         public List<GroupResult> GetGroups()
         {
             Uri pingUri = GetUri(GroupsPath);
             using (HttpClient client = GetClient()) {
                 HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(pingUri);
                 HttpWebResponse response = client.Send(request);
-                return ExtractResponse<List<GroupResult>>(response);
+                return (null == response)
+                    ? null
+                    : ExtractResponse<List<GroupResult>>(response);
             }
         }
 
@@ -103,7 +117,9 @@ namespace CwApi
             using (HttpClient client = GetClient()) {
                 HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(pingUri);
                 HttpWebResponse response = client.Send(request);
-                return ExtractResponse<PingResult>(response);
+                return (null == response)
+                    ? null
+                    : ExtractResponse<PingResult>(response);
             }
         }
 
