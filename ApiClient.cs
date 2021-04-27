@@ -5,6 +5,8 @@ using System.Net;
 using System.Security;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using ApiAuth;
 
@@ -13,10 +15,13 @@ namespace CwApi
     public class ApiClient
     {
         private string CyberwatchPrefix = "Cyberwatch";
+        private const string GroupsPath = "/api/v3/groups";
         private const string PingPath = "/api/v3/ping";
         private string _apiKey;
         private SecureString _apiSecret;
         private Uri _baseUri;
+        private JsonSerializerOptions jsonDeserializationOptions =
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
         public ApiClient(Uri baseUri, string keyId, SecureString secretKey)
         {
@@ -44,7 +49,12 @@ namespace CwApi
             Authenticate(request);
         }
 
-        private string ExtractResponse(HttpWebResponse response)
+        private T DeserializeResponse<T>(string from)
+        {
+            return JsonSerializer.Deserialize<T>(from, jsonDeserializationOptions);
+        }
+
+        private T ExtractResponse<T>(HttpWebResponse response)
         {
             using (Stream responseStream = response.GetResponseStream()) {
                 using (MemoryStream fullResponse = new MemoryStream()) {
@@ -56,9 +66,9 @@ namespace CwApi
                         }
                         fullResponse.Write(buffer, 0, inputBytes);
                     }
-                    string responseText = Encoding.ASCII.GetString(fullResponse.GetBuffer());
-                    Console.WriteLine(responseText);
-                    return responseText;
+                    string responseText =
+                        Encoding.ASCII.GetString(fullResponse.GetBuffer());
+                    return DeserializeResponse<T>(responseText);
                 }
             }
         }
@@ -77,13 +87,23 @@ namespace CwApi
             return new Uri(_baseUri, path ?? throw new ArgumentNullException(nameof(path)));
         }
 
-        public string Ping()
+        public List<GroupResult> GetGroups()
+        {
+            Uri pingUri = GetUri(GroupsPath);
+            using (HttpClient client = GetClient()) {
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(pingUri);
+                HttpWebResponse response = client.Send(request);
+                return ExtractResponse<List<GroupResult>>(response);
+            }
+        }
+
+        public PingResult Ping()
         {
             Uri pingUri = GetUri(PingPath);
             using (HttpClient client = GetClient()) {
                 HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(pingUri);
                 HttpWebResponse response = client.Send(request);
-                return ExtractResponse(response);
+                return ExtractResponse<PingResult>(response);
             }
         }
 
@@ -92,9 +112,9 @@ namespace CwApi
             if (null == candidate) {
                 throw new ArgumentNullException(nameof(candidate));
             }
-            //if ("HTTPS" != candidate.Scheme.ToUpper()) {
-            //    throw new ArgumentException("HTTPS scheme is required.");
-            //}
+            if ("HTTPS" != candidate.Scheme.ToUpper()) {
+                throw new ArgumentException("HTTPS scheme is required.");
+            }
             // TODO : consider additional checks.
             return candidate;
         }
