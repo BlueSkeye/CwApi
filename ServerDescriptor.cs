@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 
 namespace CwApi
 {
-    public class ServerResult
+    public class ServerDescriptor
     {
+        public ServerDetails Details { get; set; }
+
         [JsonPropertyName("environment")]
         public _Environment Environment { get; set; }
 
@@ -39,7 +41,7 @@ namespace CwApi
         public _OperatingSystem OS { get; set; }
 
         [JsonPropertyName("reboot_required")]
-        public bool RebootRequired { get; set; }
+        public bool? RebootRequired { get; set; }
 
         public class _Environment
         {

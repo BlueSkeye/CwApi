@@ -16,11 +16,15 @@ namespace CwApi
     public class ApiClient
     {
         private string CyberwatchPrefix = "Cyberwatch";
+        private const string CVEsPath = "/api/v3/vulnerabilities/cve_announcements";
         private const string DiscoveredAssetsPath = "/api/v3/hosts";
         private const string GroupPathPattern = "/api/v3/groups/{0}";
         private const string GroupsPath = "/api/v3/groups";
         private const string PingPath = "/api/v3/ping";
-        private const string ServersPath = "/api/v3/servers";
+        private const string SecurityIssuesPath = "/api/v3/vulnerabilities/security_issues";
+        // private const string ServersPath = "/api/v3/servers";
+        private const string ServerDetailsPath = "/api/v3/vulnerabilities/servers/{0}";
+        private const string ServersPath = "/api/v3/vulnerabilities/servers";
         private string _apiKey;
         private SecureString _apiSecret;
         private Uri _baseUri;
@@ -80,30 +84,21 @@ namespace CwApi
         {
             HttpClient client = HttpClient.Create();
             client.ApiKeyId = _apiKey;
-            client.ApiSecretKey = _apiSecret;
+            // The HTTP client will dispose the secret key hence we need to
+            // provide a copy of our key.
+            client.ApiSecretKey = _apiSecret.Copy();
             client.AuthorizationPrefix = CyberwatchPrefix;
             return client;
         }
 
-        private Uri GetUri(string path, PaginationRequest pagination = null)
+        public List<CVE> GetCVEs(PaginationRequest pagination = null)
         {
-            if (null == pagination) {
-                pagination = new PaginationRequest();
-            }
-            path = (path ?? throw new ArgumentNullException(nameof(path))) +
-                string.Format("?per_page={0}&page={1}",
-                    pagination.PageSize, pagination.PageNumber);
-            return new Uri(_baseUri, path);
-        }
-
-        public List<HostResult> GetHosts(PaginationRequest pagination = null)
-        {
-            return GetPaginatedResults<HostResult>(DiscoveredAssetsPath, pagination);
+            return GetPaginatedResults<CVE>(CVEsPath, pagination);
         }
 
         public GroupResult GetGroup(int groupId)
         {
-            Uri uri = GetUri(string.Format(GroupPathPattern, groupId));
+            Uri uri = GetUri(string.Format(GroupPathPattern, groupId), null);
             using (HttpClient client = GetClient()) {
                 HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
                 HttpWebResponse response = client.Send(request);
@@ -116,6 +111,11 @@ namespace CwApi
         public List<GroupResult> GetGroups(PaginationRequest pagination = null)
         {
             return GetPaginatedResults<GroupResult>(GroupsPath, pagination);
+        }
+
+        public List<HostResult> GetHosts(PaginationRequest pagination = null)
+        {
+            return GetPaginatedResults<HostResult>(DiscoveredAssetsPath, pagination);
         }
 
         private List<T> GetPaginatedResults<T>(string uriPath,
@@ -156,9 +156,44 @@ namespace CwApi
             }
         }
 
-        public List<ServerResult> GetServers(PaginationRequest pagination = null)
+        private T GetSingleResult<T>(string uriPath)
+            where T : class
         {
-            return GetPaginatedResults<ServerResult>(ServersPath, pagination);
+            using (HttpClient client = GetClient()) {
+                Uri uri = GetUri(uriPath, null);
+                HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
+                HttpWebResponse response = client.Send(request);
+                if (null == response) {
+                    return null;
+                }
+                return ExtractResponse<T>(response);
+            }
+        }
+
+        public ServerDetails GetServerDetails(int serverId)
+        {
+            return GetSingleResult<ServerDetails>(
+                string.Format(ServerDetailsPath, serverId));
+        }
+
+        public List<ServerDescriptor> GetServers(PaginationRequest pagination = null)
+        {
+            return GetPaginatedResults<ServerDescriptor>(ServersPath, pagination);
+        }
+
+        public List<SecurityIssue> GetSecurityIssues(PaginationRequest pagination = null)
+        {
+            return GetPaginatedResults<SecurityIssue>(SecurityIssuesPath, pagination);
+        }
+
+        private Uri GetUri(string path, PaginationRequest pagination = null)
+        {
+            if (null != pagination) {
+                path = (path ?? throw new ArgumentNullException(nameof(path))) +
+                    string.Format("?per_page={0}&page={1}",
+                        pagination.PageSize, pagination.PageNumber);
+            }
+            return new Uri(_baseUri, path);
         }
 
         private static void ParseLink(string linkValue, out int? lastPageNumber,
@@ -214,7 +249,7 @@ namespace CwApi
 
         public PingResult Ping()
         {
-            Uri uri = GetUri(PingPath);
+            Uri uri = GetUri(PingPath, null);
             using (HttpClient client = GetClient()) {
                 HttpWebRequest request = (HttpWebRequest)HttpWebRequest.Create(uri);
                 HttpWebResponse response = client.Send(request);
