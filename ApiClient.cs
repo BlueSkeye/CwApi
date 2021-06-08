@@ -13,7 +13,7 @@ using ApiAuth;
 
 namespace CwApi
 { 
-    public class ApiClient
+    public class ApiClient : IDisposable
     {
         private string CyberwatchPrefix = "Cyberwatch";
         private const string CVEsPath = "/api/v3/vulnerabilities/cve_announcements";
@@ -41,6 +41,11 @@ namespace CwApi
             _apiSecret = secretKey ?? throw new ArgumentNullException(nameof(secretKey));
         }
 
+        ~ApiClient()
+        {
+            Dispose(false);
+        }
+
         private void Authenticate(HttpWebRequest request)
         {
             string now = DateTime.UtcNow.ToString("R");
@@ -60,6 +65,19 @@ namespace CwApi
         private T DeserializeResponse<T>(string from)
         {
             return JsonSerializer.Deserialize<T>(from, jsonDeserializationOptions);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing) {
+                GC.SuppressFinalize(this);
+            }
+            _apiSecret.Dispose();
         }
 
         private T ExtractResponse<T>(HttpWebResponse response)
