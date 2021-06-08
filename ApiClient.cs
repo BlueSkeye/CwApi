@@ -12,7 +12,7 @@ using System.Text.Json.Serialization;
 using ApiAuth;
 
 namespace CwApi
-{
+{ 
     public class ApiClient
     {
         private string CyberwatchPrefix = "Cyberwatch";
